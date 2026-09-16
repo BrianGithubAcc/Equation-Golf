@@ -13,6 +13,14 @@ DATABASE_URL = os.getenv(
     ),
 )
 
+# Neon provides postgresql:// URLs. Explicitly use Psycopg 3.
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace(
+        "postgresql://",
+        "postgresql+psycopg://",
+        1,
+    )
+
 
 engine = create_engine(
     DATABASE_URL,
