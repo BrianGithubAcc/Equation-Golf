@@ -31,7 +31,9 @@ DEVELOPMENT_DATABASE_URL = os.getenv(
 )
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    str(make_url(DEVELOPMENT_DATABASE_URL).set(database="equationgolf_test")),
+    make_url(DEVELOPMENT_DATABASE_URL)
+    .set(database="equationgolf_test")
+    .render_as_string(hide_password=False),
 )
 
 

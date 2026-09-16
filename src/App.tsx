@@ -533,7 +533,7 @@ export default function App() {
               </div>
             </details>
           ) : (
-            <a className="header-link" href={`${API}/auth/google`}>
+            <a className="header-link" href={`${API}/api/auth/google`}>
               Sign in
             </a>
           )}
@@ -1047,7 +1047,7 @@ export default function App() {
               to save a score to the daily leaderboard.
             </p>
 
-            <a className="google-login-button" href={`${API}/auth/google`}>
+            <a className="google-login-button" href={`${API}/api/auth/google`}>
               Sign in with Google
             </a>
 

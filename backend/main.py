@@ -1207,7 +1207,7 @@ def delete_me(request: Request):
 # Google login
 # ---------------------------------------------------------
 
-@app.get("/auth/google")
+@app.get("/api/auth/google")
 async def google_login(
     request: Request,
 ):
@@ -1226,7 +1226,7 @@ async def google_login(
 
     callback = (
         f"{BACKEND_URL}"
-        "/auth/google/callback"
+        "/api/auth/google/callback"
     )
 
     return await client.authorize_redirect(
@@ -1236,7 +1236,7 @@ async def google_login(
 
 
 @app.get(
-    "/auth/google/callback"
+    "/api/auth/google/callback"
 )
 async def google_callback(
     request: Request,
