@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+psycopg[binary]
+alembic
+sympy
+antlr4-python3-runtime==4.11.*
+authlib
+httpx
+python-dotenv
+itsdangerous
