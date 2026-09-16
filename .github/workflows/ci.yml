@@ -1,0 +1,136 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+# Give the GitHub Actions token the minimum permission we need.
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------
+  # Backend tests
+  # ---------------------------------------------------------
+  test-backend:
+    name: Backend tests
+
+    # GitHub creates a temporary VM for this job.
+    # It is destroyed when the job finishes.
+    runs-on: ubuntu-latest
+
+    # Prevent a broken/malicious test from running forever.
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+
+        # These are disposable CI-only credentials.
+        # They are NOT your real production credentials.
+        env:
+          POSTGRES_USER: equationgolf
+          POSTGRES_PASSWORD: equationgolf
+          POSTGRES_DB: equationgolf_test
+
+        ports:
+          - 5432:5432
+
+        options: >-
+          --health-cmd "pg_isready -U equationgolf -d equationgolf_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Disposable CI database.
+      DATABASE_URL: postgresql+psycopg://equationgolf:equationgolf@127.0.0.1:5432/equationgolf_test
+
+      TEST_DATABASE_URL: postgresql+psycopg://equationgolf:equationgolf@127.0.0.1:5432/equationgolf_test
+
+      # Explicitly keep the app out of production mode during tests.
+      APP_ENV: test
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          # Do not leave GitHub credentials in the checked-out repository.
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run backend tests
+        run: pytest
+
+  # ---------------------------------------------------------
+  # Frontend build
+  # ---------------------------------------------------------
+  build-frontend:
+    name: Frontend build
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      # Uses package-lock.json exactly.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+  # ---------------------------------------------------------
+  # Docker builds
+  # ---------------------------------------------------------
+  build-docker:
+    name: Docker build
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Build backend image
+        run: |
+          docker build \
+            --file Dockerfile.backend \
+            --tag equation-golf-backend:ci \
+            .
+
+      - name: Build frontend image
+        run: |
+          docker build \
+            --file Dockerfile.frontend \
+            --tag equation-golf-web:ci \
+            .
