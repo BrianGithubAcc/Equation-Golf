@@ -1,0 +1,30 @@
+{$SITE_ADDRESS} {
+    encode zstd gzip
+
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # Send API requests to the FastAPI container.
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+
+    # Send Google OAuth requests to FastAPI too.
+    handle /auth/* {
+        reverse_proxy backend:8000
+    }
+
+    # Everything else is the React website.
+    handle {
+        root * /srv
+
+        # If the requested file doesn't exist,
+        # serve index.html so React routing still works.
+        try_files {path} /index.html
+
+        file_server
+    }
+}

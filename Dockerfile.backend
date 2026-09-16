@@ -1,0 +1,36 @@
+FROM python:3.12-slim
+
+#Dont cache inside container
+#Python unbuffered output so stout can be seen in docker
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+#/app ,on same level as /tmp,/etc,/var,/usr,/bin,/lib
+WORKDIR /app
+
+#Install python packages
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+#create user and group (don't run as root)
+RUN addgroup --system app && \
+    adduser --system --ingroup app app
+
+#Backend code and alembic migrations
+COPY backend ./backend
+COPY alembic ./alembic
+COPY alembic.ini .
+
+#Give user permission for /app dir
+RUN chown -R app:app /app
+
+
+#Switch to user
+USER app
+
+#
+EXPOSE 8000
+
+#uvicorn setup
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=*"]

@@ -1,0 +1,111 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+    networks:
+      - data
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+
+    command: ["alembic", "upgrade", "head"]
+
+    restart: "no"
+
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    networks:
+      - data
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+
+    restart: unless-stopped
+
+    environment:
+      APP_ENV: production
+      FRONTEND_URL: ${FRONTEND_URL}
+      BACKEND_URL: ${BACKEND_URL}
+
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+
+      SESSION_SECRET: ${SESSION_SECRET}
+
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+    expose:
+      - "8000"
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=2)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+    networks:
+      - edge
+      - data
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+
+    restart: unless-stopped
+
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS}
+
+    ports:
+      - "8080:80"
+
+    depends_on:
+      backend:
+        condition: service_healthy
+
+    networks:
+      - edge
+
+volumes:
+  postgres_data:
+
+networks:
+  edge:
+
+  data:
+    internal: true
