@@ -7,5 +7,5 @@ __pycache__
 *.pyc
 
 .env
-.env.production
-.env.production.local
+.env.*
+!.env.production.example

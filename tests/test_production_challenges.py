@@ -45,7 +45,7 @@ def test_generation_is_deterministic_and_uses_more_than_365_candidates():
         start_date=date(2030, 1, 1),
         count=20,
         candidate_count_per_family=25,
-        seed=20260917,
+        seed=TEST_SEED,
     )
 
     assert first == second
