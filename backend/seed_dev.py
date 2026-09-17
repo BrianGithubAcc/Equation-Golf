@@ -21,8 +21,10 @@ def _database_identity(url):
 
 
 def main():
-    if os.getenv("APP_ENV", "development").lower() == "production":
-        raise RuntimeError("Development seeding is disabled in production")
+    if os.getenv("APP_ENV", "development").lower() != "development":
+        raise RuntimeError(
+            "Development seeding requires APP_ENV=development"
+        )
 
     test_url = os.getenv("TEST_DATABASE_URL")
     if (

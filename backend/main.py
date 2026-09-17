@@ -31,6 +31,8 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import JSONResponse
 from starlette.responses import RedirectResponse
 
+from authlib.integrations.base_client.errors import OAuthError
+
 from sympy import (
     Abs,
     Add,
@@ -55,11 +57,10 @@ from sympy.parsing.latex import parse_latex
 from sympy import preorder_traversal
 from sympy.utilities.lambdify import lambdify
 
+load_dotenv()
+
 from .database import SessionLocal
 from .models import ArchivedLeaderboard, Challenge, Submission, User
-
-
-load_dotenv()
 
 
 FRONTEND_URL = os.getenv(
@@ -74,7 +75,7 @@ BACKEND_URL = os.getenv(
 
 APP_ENV = os.getenv(
     "APP_ENV",
-    "development",
+    "production" if os.getenv("VERCEL") == "1" else "development",
 ).lower()
 
 configured_session_secret = os.getenv("SESSION_SECRET")
@@ -85,6 +86,18 @@ if APP_ENV == "production" and (
     raise RuntimeError(
         "SESSION_SECRET must be set to at least 32 characters in production"
     )
+
+if APP_ENV == "production":
+    missing_production_settings = [
+        name
+        for name in ("DATABASE_URL", "FRONTEND_URL", "BACKEND_URL")
+        if not os.getenv(name)
+    ]
+    if missing_production_settings:
+        raise RuntimeError(
+            "Missing production settings: "
+            + ", ".join(missing_production_settings)
+        )
 
 SESSION_SECRET = configured_session_secret or "dev-only-change-me"
 
@@ -107,8 +120,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[FRONTEND_URL],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type"],
 )
 
 
@@ -1254,12 +1267,18 @@ async def google_callback(
             ),
         )
 
-    token = (
-        await client
-        .authorize_access_token(
-            request
+    try:
+        token = (
+            await client
+            .authorize_access_token(
+                request
+            )
         )
-    )
+    except OAuthError as error:
+        raise HTTPException(
+            status_code=400,
+            detail="Google sign-in could not be completed",
+        ) from error
 
     profile = token.get(
         "userinfo"
@@ -1270,6 +1289,12 @@ async def google_callback(
             await client.userinfo(
                 token=token
             )
+        )
+
+    if not isinstance(profile, dict) or not profile.get("sub"):
+        raise HTTPException(
+            status_code=400,
+            detail="Google did not return a valid user profile",
         )
 
     google_name = clean_display_name(str(profile.get("name") or ""))
