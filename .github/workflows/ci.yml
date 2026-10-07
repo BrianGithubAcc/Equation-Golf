@@ -153,6 +153,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
+    environment: production
+
     concurrency:
       group: equation-golf-production-deployment
       cancel-in-progress: false
@@ -181,8 +183,7 @@ jobs:
           done
           if [ "${#missing[@]}" -gt 0 ]; then
             printf 'Missing or empty GitHub Actions repository secret(s): %s\n' "${missing[*]}" >&2
-            echo "Add them under Settings > Secrets and variables > Actions > Repository secrets." >&2
-            echo "If stored as environment secrets, assign the same environment to this job." >&2
+            echo "Add them as repository secrets, or as secrets on the production environment." >&2
             exit 1
           fi
 

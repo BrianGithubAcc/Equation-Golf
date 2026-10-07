@@ -151,7 +151,8 @@ Configure Azure once:
    `equation-golf` and `equation-golf-api` Container App resources in the
    `equation_golf` resource group.
 4. In the GitHub repository's **Settings → Secrets and variables → Actions**,
-   add these repository secrets:
+   add these secrets to the `production` environment (used by the deployment
+   job) or as repository secrets:
    - `AZURE_CLIENT_ID`
    - `AZURE_TENANT_ID`
    - `AZURE_SUBSCRIPTION_ID`
