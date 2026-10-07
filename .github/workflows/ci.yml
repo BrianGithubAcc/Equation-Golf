@@ -167,6 +167,25 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Validate Azure deployment settings
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          missing=()
+          for setting in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID; do
+            if [ -z "${!setting}" ]; then
+              missing+=("$setting")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing or empty GitHub Actions repository secret(s): %s\n' "${missing[*]}" >&2
+            echo "Add them under Settings > Secrets and variables > Actions > Repository secrets." >&2
+            echo "If stored as environment secrets, assign the same environment to this job." >&2
+            exit 1
+          fi
+
       - name: Sign in to Azure
         uses: azure/login@v2
         with:
