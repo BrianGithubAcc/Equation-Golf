@@ -21,9 +21,7 @@ services:
       - data
 
   migrate:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
+    image: ${ACR_LOGIN_SERVER:?Set ACR_LOGIN_SERVER}/equation-golf-backend:${IMAGE_TAG:-latest}
 
     command: ["alembic", "upgrade", "head"]
 
@@ -40,9 +38,7 @@ services:
       - data
 
   backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
+    image: ${ACR_LOGIN_SERVER:?Set ACR_LOGIN_SERVER}/equation-golf-backend:${IMAGE_TAG:-latest}
 
     restart: unless-stopped
 
@@ -82,9 +78,7 @@ services:
       - data
 
   web:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
+    image: ${ACR_LOGIN_SERVER:?Set ACR_LOGIN_SERVER}/equation-golf:${IMAGE_TAG:-latest}
 
     restart: unless-stopped
 

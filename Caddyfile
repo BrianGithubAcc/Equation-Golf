@@ -10,7 +10,9 @@
 
     # Send API requests to the FastAPI container.
     handle /api/* {
-        reverse_proxy backend:8000
+        reverse_proxy {$BACKEND_ADDRESS:backend:8000} {
+            header_up Host {upstream_hostport}
+        }
     }
 
     # Everything else is the React website.
