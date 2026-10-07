@@ -17,7 +17,6 @@ challenge.
 | `backend/` | FastAPI routes, authentication, scoring, models, seeds, and challenge tools |
 | `alembic/` | Database migrations |
 | `tests/` | API, scoring, privacy, archive, generator, and importer tests |
-| `api/index.py` | Vercel entry point for the FastAPI application |
 | `compose.yaml` | Local PostgreSQL service |
 | `data/production_challenges.json` | Private generated challenge artifact; intentionally ignored by Git |
 
@@ -113,45 +112,18 @@ The test suite uses `TEST_DATABASE_URL` when it is set. Keep it separate from
 `DATABASE_URL`; the tests create and remove their own test database when
 possible.
 
-## Deploy to Vercel
-
-Vercel uses [`api/index.py`](api/index.py) as the FastAPI entry point and
-[`vercel.json`](vercel.json) to route `/api/*` requests. From the repository
-root, deploy with:
-
-```bash
-nix develop --command npx vercel --prod
-```
-
-Before deploying, add these variables to the Vercel project’s **Production**
-environment. Use real values in Vercel or a secret manager, not in Git:
-
-```text
-APP_ENV=production
-DATABASE_URL=postgresql+psycopg://...
-SESSION_SECRET=<at least 32 random characters>
-FRONTEND_URL=https://your-domain.example
-BACKEND_URL=https://your-domain.example
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
-```
-
-In the usual single-domain setup, `FRONTEND_URL` and `BACKEND_URL` are the
-same public origin. Production startup refuses to run when the database URL,
-public URLs, or a sufficiently long session secret are missing.
-
 ### Google sign-in
 
 The Google OAuth client must contain this exact authorised redirect URI, with
-your real domain substituted:
+the public Container App domain (or your custom domain) substituted:
 
 ```text
 https://your-domain.example/api/auth/google/callback
 ```
 
-The client ID and secret in Google Cloud must match the values configured in
-Vercel. After changing Vercel environment variables, deploy again so the new
-values are used.
+Configure the matching `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` as
+Container App secrets/environment variables. After changing them, restart or
+deploy a new revision so the app receives the updated values.
 
 ## Publish Docker images to Azure Container Registry
 
@@ -164,8 +136,8 @@ healthy and running the expected commit-tagged image.
 
 Configure Azure once:
 
-1. Create an ACR and an Entra ID application/service principal for GitHub
-   Actions. Add a federated credential that trusts this repository's
+1. Use an Entra ID application/service principal for GitHub Actions. Add a
+   federated credential that trusts this repository's
    `main` branch using the GitHub Actions OIDC provider:
    - Issuer: `https://token.actions.githubusercontent.com`
    - Subject: `repo:BrianGithubAcc/Equation-Golf:ref:refs/heads/main`
@@ -326,19 +298,29 @@ PostgreSQL databases and checks the frontend and Docker builds.
 
 ## Troubleshooting
 
-**`npx: command not found`**
+**GitHub Actions Azure login reports missing `client-id` or `tenant-id`**
 
-Run Vercel from the Nix shell:
+In **Settings → Secrets and variables → Actions**, confirm that the repository
+secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID` exist
+and are non-empty. `AZURE_CLIENT_ID` is the Entra application (client) ID;
+`AZURE_TENANT_ID` is its directory (tenant) ID; and
+`AZURE_SUBSCRIPTION_ID` is the Azure for Students subscription ID. If the
+values are configured as environment secrets instead, configure that same
+GitHub environment on the publishing job.
+
+**`npm: command not found`**
+
+Run Node commands from the Nix shell:
 
 ```bash
-nix develop --command npx vercel --prod
+nix develop --command npm run build
 ```
 
 **Google reports `invalid_client`**
 
-Check that the Google client secret in Vercel is current and belongs to the
-same client ID being used by the deployment. Then check the redirect URI,
-including the domain and `/api/auth/google/callback` path.
+Check that the Google client secret configured on the Container App is current
+and belongs to the same client ID used by the deployment. Then check the
+redirect URI, including the domain and `/api/auth/google/callback` path.
 
 **`curl -I /api/auth/google` returns `405`**
 
