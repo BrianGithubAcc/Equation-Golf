@@ -31,6 +31,5 @@ dist-ssr
 __pycache__/
 *.pyc
 .pytest_cache/
-.vercel
 .env*
 data/production_challenges.json
