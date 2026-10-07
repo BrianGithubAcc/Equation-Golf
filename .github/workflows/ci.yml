@@ -137,3 +137,146 @@ jobs:
             --file Dockerfile.frontend \
             --tag equation-golf-web:ci \
             .
+
+  # ---------------------------------------------------------
+  # Publish images to Azure Container Registry
+  # ---------------------------------------------------------
+  publish-acr:
+    name: Publish to Azure Container Registry
+
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - test-backend
+      - build-frontend
+      - build-docker
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    concurrency:
+      group: equation-golf-production-deployment
+      cancel-in-progress: false
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Sign in to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign in to Azure Container Registry
+        id: registry
+        env:
+          ACR_NAME: ${{ vars.ACR_NAME }}
+        run: |
+          if [ -z "$ACR_NAME" ]; then
+            echo "Set the ACR_NAME Actions variable to your registry name." >&2
+            exit 1
+          fi
+          az acr login --name "$ACR_NAME"
+          echo "login_server=$(az acr show --name "$ACR_NAME" --query loginServer --output tsv)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Publish backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.backend
+          push: true
+          tags: |
+            ${{ steps.registry.outputs.login_server }}/equation-golf-backend:latest
+            ${{ steps.registry.outputs.login_server }}/equation-golf-backend:${{ github.sha }}
+
+      - name: Publish frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.frontend
+          push: true
+          tags: |
+            ${{ steps.registry.outputs.login_server }}/equation-golf:latest
+            ${{ steps.registry.outputs.login_server }}/equation-golf:${{ github.sha }}
+
+      - name: Install Container Apps CLI extension
+        run: az extension add --name containerapp --upgrade --yes
+
+      - name: Deploy backend Container App
+        env:
+          LOGIN_SERVER: ${{ steps.registry.outputs.login_server }}
+        run: |
+          az containerapp update \
+            --name equation-golf-api \
+            --resource-group equation_golf \
+            --image "$LOGIN_SERVER/equation-golf-backend:$GITHUB_SHA" \
+            --output none
+
+      - name: Deploy frontend Container App
+        env:
+          LOGIN_SERVER: ${{ steps.registry.outputs.login_server }}
+        run: |
+          az containerapp update \
+            --name equation-golf \
+            --resource-group equation_golf \
+            --image "$LOGIN_SERVER/equation-golf:$GITHUB_SHA" \
+            --output none
+
+      - name: Wait for Container Apps revisions
+        shell: bash
+        run: |
+          wait_for_healthy_revision() {
+            local app_name="$1"
+            local expected_image="$2"
+            local revision
+            revision="$(az containerapp show \
+              --name "$app_name" \
+              --resource-group equation_golf \
+              --query properties.latestRevisionName \
+              --output tsv)"
+
+            for attempt in $(seq 1 40); do
+              local revision_details state image
+              revision_details="$(az containerapp revision show \
+                --name "$app_name" \
+                --resource-group equation_golf \
+                --revision "$revision" \
+                --query '{health:properties.healthState,image:properties.template.containers[0].image}' \
+                --output json)"
+              state="$(jq -r '.health' <<< "$revision_details")"
+              image="$(jq -r '.image' <<< "$revision_details")"
+              if [ "$image" != "$expected_image" ]; then
+                echo "$app_name revision $revision uses unexpected image $image (expected $expected_image)." >&2
+                return 1
+              fi
+              if [ "$state" = "Healthy" ]; then
+                echo "$app_name revision $revision is healthy with $image."
+                return 0
+              fi
+              if [ "$state" = "Unhealthy" ]; then
+                echo "$app_name revision $revision is unhealthy." >&2
+                return 1
+              fi
+              sleep 15
+            done
+
+            echo "Timed out waiting for $app_name revision $revision (last state: $state)." >&2
+            return 1
+          }
+
+          wait_for_healthy_revision \
+            equation-golf-api \
+            "${{ steps.registry.outputs.login_server }}/equation-golf-backend:$GITHUB_SHA"
+          wait_for_healthy_revision \
+            equation-golf \
+            "${{ steps.registry.outputs.login_server }}/equation-golf:$GITHUB_SHA"

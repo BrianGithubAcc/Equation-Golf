@@ -9,3 +9,4 @@ __pycache__
 .env
 .env.*
 !.env.production.example
+data/production_challenges.json

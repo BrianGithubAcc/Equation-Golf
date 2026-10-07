@@ -153,6 +153,79 @@ The client ID and secret in Google Cloud must match the values configured in
 Vercel. After changing Vercel environment variables, deploy again so the new
 values are used.
 
+## Publish Docker images to Azure Container Registry
+
+The GitHub Actions workflow tests and builds the backend and frontend on pull
+requests and pushes to `main`. After a successful push to `main`, it publishes
+both images to Azure Container Registry (ACR) and updates the backend and
+frontend Container Apps to the commit-tagged images. Production deployments
+are serialized, and the workflow verifies that each deployed revision is
+healthy and running the expected commit-tagged image.
+
+Configure Azure once:
+
+1. Create an ACR and an Entra ID application/service principal for GitHub
+   Actions. Add a federated credential that trusts this repository's
+   `main` branch using the GitHub Actions OIDC provider:
+   - Issuer: `https://token.actions.githubusercontent.com`
+   - Subject: `repo:BrianGithubAcc/Equation-Golf:ref:refs/heads/main`
+   - Audience: `api://AzureADTokenExchange`
+2. Give that identity **Container Registry Repository Writer** access to the
+   `equation-golf` and `equation-golf-backend` repositories in ACR. Since this
+   registry uses repository ABAC permissions, scope the role assignment with a
+   condition for those two repositories rather than using the legacy `AcrPush`
+   role.
+3. Give the identity **Container Apps Contributor** access scoped to the
+   `equation-golf` and `equation-golf-api` Container App resources in the
+   `equation_golf` resource group.
+4. In the GitHub repository's **Settings → Secrets and variables → Actions**,
+   add these repository secrets:
+   - `AZURE_CLIENT_ID`
+   - `AZURE_TENANT_ID`
+   - `AZURE_SUBSCRIPTION_ID`
+5. Add the repository variable `ACR_NAME` with the ACR resource name
+   (`equationgolf`, not its `*.azurecr.io` login server).
+
+Do not enable ACR's admin account or store a registry password in GitHub. The
+workflow signs in through OIDC and needs no long-lived registry credentials.
+After setup, pushing to `main` publishes and deploys:
+
+```text
+<your-acr>.azurecr.io/equation-golf-backend:latest
+<your-acr>.azurecr.io/equation-golf-backend:<commit-sha>
+<your-acr>.azurecr.io/equation-golf:latest
+<your-acr>.azurecr.io/equation-golf:<commit-sha>
+```
+
+For a production Compose deployment, copy `.env.production.example` to
+`.env.production`, set `ACR_LOGIN_SERVER` to the registry login server and
+`IMAGE_TAG` to the image tag, then authenticate to ACR and deploy:
+
+```bash
+az acr login --name your-registry
+docker compose --env-file .env.production -f compose.prod.yaml pull
+docker compose --env-file .env.production -f compose.prod.yaml up -d
+```
+
+Use the same commit SHA for `IMAGE_TAG` to deploy the matching backend and
+frontend images. Keep `.env.production` private; registry credentials should
+come from the Azure/Docker login mechanism rather than that file.
+
+### Azure Container Apps
+
+The `equation-golf` image built from `Dockerfile.frontend` is the web/Caddy
+container. It listens on `:80` (all interfaces), so configure the Container
+App ingress target port as `80`. The API is a separate backend container,
+which listens on `0.0.0.0:8000`; set the web Container App's
+`BACKEND_ADDRESS` environment variable to the backend Container App's internal
+FQDN without a port (for example,
+`equation-golf-api.internal.<environment-domain>`). Container Apps routes
+requests to the backend's configured target port. Keep backend ingress
+internal-only; if Caddy proxies over HTTP, allow insecure traffic on that
+internal ingress so requests aren't redirected to an internal HTTPS address
+that public browsers cannot reach. The default `backend:8000` address is for
+Docker Compose networking.
+
 ## Production challenges
 
 Production challenges are generated separately from the development seed.
@@ -164,6 +237,11 @@ consecutive dates starting from the current UTC date.
 Generation is deterministic for a given generator version, private seed, and
 UTC start date. Keep the seed and the generated JSON file private: knowing the
 target expressions would defeat the game.
+
+To initialize an empty production database directly, run
+`python -m backend.initialize_production_challenges` with `DATABASE_URL` and
+`PRODUCTION_CHALLENGE_SEED` set in the environment. It inserts any missing
+dates without printing target expressions; the seed must remain private.
 
 Set the seed through the environment rather than putting it in a command or
 source file:
