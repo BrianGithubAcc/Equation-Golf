@@ -277,6 +277,22 @@ export default function App() {
     return sampleLatex(playerLatex, challenge.domain.min, challenge.domain.max);
   }, [playerLatex, challenge]);
 
+  const playerGraphPoints = useMemo(() => {
+    if (!challenge) {
+      return [];
+    }
+
+    const domainCenter =
+      (challenge.domain.min + challenge.domain.max) / 2;
+    const halfSpan =
+      (challenge.domain.max - challenge.domain.min) / 2;
+    const graphMin = domainCenter - halfSpan * 32;
+    const graphMax = domainCenter + halfSpan * 32;
+    const graphStep = Math.max(0.05, (graphMax - graphMin) / 1600);
+
+    return sampleLatex(playerLatex, graphMin, graphMax, graphStep);
+  }, [playerLatex, challenge]);
+
   const previewError = useMemo(() => {
     if (!challenge) {
       return Infinity;
@@ -546,6 +562,7 @@ export default function App() {
             <Graph
               target={challenge.target_points}
               player={playerPoints}
+              playerGraph={playerGraphPoints}
               domain={challenge.domain}
               range={challenge.range}
             />
