@@ -1851,6 +1851,112 @@ button {
   pointer-events: none;
 }
 
+.graph-view {
+  width: 100%;
+}
+
+.graph-controls {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 5px 10px;
+  border-bottom: 1px solid rgba(32, 32, 29, 0.16);
+  color: var(--ink);
+  font-size: 0.78rem;
+}
+
+.graph-controls-label {
+  margin-right: 2px;
+  font-weight: 700;
+}
+
+.graph-zoom-button,
+.graph-reset-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid rgba(32, 32, 29, 0.3);
+  border-radius: 3px;
+  background: #fffdf8;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.graph-zoom-button {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.graph-zoom-button:disabled,
+.graph-reset-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.graph-zoom-button:focus-visible,
+.graph-reset-button:focus-visible {
+  outline: 2px solid var(--blue-pen);
+  outline-offset: 2px;
+}
+
+.graph-zoom-level {
+  min-width: 72px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.graph-zoom-hint {
+  margin-left: 4px;
+  color: #605b52;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.graph-domain-hint {
+  margin-left: auto;
+  color: #604b20;
+  font-size: 0.75rem;
+}
+
+.outside-domain-shade {
+  fill: rgba(32, 32, 29, 0.06);
+  pointer-events: none;
+}
+
+.challenge-domain-band {
+  fill: rgba(224, 171, 66, 0.13);
+  pointer-events: none;
+}
+
+.challenge-region-outline {
+  fill: none;
+  stroke: #986b16;
+  stroke-width: 2.5;
+  stroke-dasharray: 8 5;
+  pointer-events: none;
+}
+
+@media (max-width: 560px) {
+  .graph-controls {
+    gap: 5px;
+    padding-inline: 6px;
+  }
+
+  .graph-zoom-hint {
+    display: none;
+  }
+
+  .graph-domain-hint {
+    font-size: 0.65rem;
+  }
+}
+
 /* -------------------------------------------
    Account menu final behaviour
 ------------------------------------------- */
